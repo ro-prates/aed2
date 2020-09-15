@@ -1,389 +1,235 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+ 
+struct NO{
+    int info;
+    int alt;
+    struct NO *esq;
+    struct NO *dir;
+};
+ 
+typedef struct NO* ArvAVL;
 
-typedef int TChave;
-
-typedef struct {
-	TChave Chave;
-} TItem;
-
-typedef struct SNo *TArvBin;
-
-typedef struct SNo {
-	TItem Item;
-	TArvBin Esq, Dir;
-	int fb; //Fator de balanceamento
-} TNo;
-
-//Calcula o fator de balanceamento
-int FB(TArvBin No){
-	if (No == NULL)
-		return 0;
-	return No->fb;
+int alt_NO(struct NO* no){
+    if(no == NULL)
+        return -1;
+    else
+        return no->alt;
 }
 
-//Rotação LL
-void LL(TArvBin *pA, int IorR){
-	TArvBin pB = (*pA)->Esq; 
-
-    if(IorR == 1) {
-        (*pA)->fb = 0;
-        pB->fb = 0;
-    }
-    
-    else if(IorR == 2) {
-        if(pB->fb == 0){
-            (*pA)->fb = 1;
-            pB->fb = -1;
-        }
-        else {
-            (*pA)->fb = 0;
-            pB->fb = 0;
-        }
-    }
-
-    (*pA)->Esq = pB->Dir;
-    pB->Dir = (*pA);
-    (*pA) = pB;
+int fatorBalanceamento_NO(struct NO* no){
+    return labs(alt_NO(no->esq) - alt_NO(no->dir));
 }
 
-//Rotação RR
-void RR(TArvBin *pA, int IorR){
-	TArvBin pB = (*pA)->Dir;
-
-    if(IorR == 1) {
-        (*pA)->fb = 0;
-        pB->fb = 0;
-    }
-    
-    else if(IorR == 2) {
-        if(pB->fb == 0){
-            (*pA)->fb = -1;
-            pB->fb = 1;
-        }
-        else {
-            (*pA)->fb = 0;
-            pB->fb = 0;
-        }
-    }
-    //Efetuando a rotação
-    (*pA)->Dir = pB->Esq;
-    pB->Esq = (*pA);
-    (*pA) = pB;
+int maior(int x, int y){
+    if(x > y)
+        return x;
+    else
+        return y;
 }
 
-//Rotação LR
-void LR(TArvBin *pA, int IorR){
-	TArvBin pB = (*pA)->Esq;
-    TArvBin pC = pB->Dir;
+void RotacaoLL(ArvAVL *raiz){
+    struct NO *no;
+    no = (*raiz)->esq;
+    (*raiz)->esq = no -> dir;
+    no->dir = *raiz;
+    (*raiz)->alt = maior(alt_NO((*raiz)->esq), alt_NO((*raiz)->dir)) + 1;
+    no -> alt = maior(alt_NO(no->esq), (*raiz)->alt) + 1;
+    *raiz = no;
+}
 
-    if(IorR == 1) {
-        //Para LR corrigimos os fatores de balanceamento em fução do nó C
-        if(pC->fb == 1) { //Se C era 1, os novos fatores são A: -1 e B: 0
-            (*pA)->fb = -1;
-            pB->fb = 0;
-        }
-        else if(pC->fb == -1) { //Se C é -1, os novos fatores serão A: 0 e B: 1
-            (*pA)->fb = 0;
-            pB->fb = 1;
-        }
+void RotacaoRR(ArvAVL *raiz){
+    struct NO *no;
+    no = (*raiz)->dir;
+    (*raiz)->dir = no->esq;
+    no->esq = (*raiz);
+    (*raiz)->alt = maior(alt_NO((*raiz)->esq), alt_NO((*raiz)->dir)) + 1;
+    no->alt = maior(alt_NO(no->dir), (*raiz)->alt) + 1;
+    (*raiz) = no;
+}
 
-        else if (pC->fb == 0) { //Se era 0, A e B passam a ser 0
-            (*pA)->fb = 0;
-            pB->fb = 0;
-        }
+void RotacaoLR(ArvAVL *raiz){
+    RotacaoRR(&(*raiz)->esq);
+    RotacaoLL(raiz);
+}
 
+void RotacaoRL(ArvAVL *raiz){
+    RotacaoLL(&(*raiz)->dir);
+    RotacaoRR(raiz);
+}
+ 
+//função auxiliar para ajduar na remoção
+struct NO* remove_atual(struct NO* atual){
+    struct NO *no1, *no2;
+    if(atual->esq==NULL){
+        no2 = atual->dir;
+        free(atual);
+        return no2;
     }
-    //No caso da remoção temos um tratamento similiar
-    else if(IorR == 2) {
-
-        if(pC->fb == -1){  //Se C era -1, A e B passam a ser 1 e 0
-            (*pA)->fb = 0;
-            pB->fb = 1;
-
-        }
-        else if(pC->fb == 1) { //Se C era 1, A e B passam a ser 0 e -1
-            (*pA)->fb = -1;
-            pB->fb = 0;
-
-        }
-        else if (pC->fb == 0) { //Se era 0, A e B passam a ser 0
-            (*pA)->fb = 0;
-            pB->fb = 0;
-
-        }
+    no1 = atual;
+    no2 = atual->esq;
+ 
+    while(no2->dir != NULL){
+        no1 = no2;
+        no2 = no2->dir;
     }
-    //Independente do caso o novo fator de C sempre é zero
-     pC->fb = 0;
-
-    pB->Dir = pC->Esq;
-    pC->Esq = pB;
-    (*pA)->Esq = pC->Dir;
-    pC->Dir = (*pA);
-    *pA = pC;
-
-}
-
-void RL(TArvBin *pA, int IorR){
-	TArvBin pB = (*pA)->Dir;
-    TArvBin pC = pB->Esq;
-    //Os casos para inserção e remoção em RL acontecem de maneira simetrica a LR
-    if(IorR == 1) {
-        if(pC->fb == 1) {
-            (*pA)->fb = 0;
-            pB->fb = -1;
-        }
-        else if(pC->fb == -1) {
-            (*pA)->fb = 1;
-            pB->fb = 0;
-        }
-
-        else if (pC->fb == 0) {
-            (*pA)->fb = 0;
-            pB->fb = 0;
-        }
-
+ 
+    if(no1 != atual){
+        no1->dir = no2->esq;
+        no2->esq = atual->esq;
     }
-
-    else if(IorR == 2) {
-
-        if(pC->fb == -1){
-            (*pA)->fb = 1;
-            pB->fb = 0;
-        }
-        else if(pC->fb == 1) {
-            (*pA)->fb = 1;
-            pB->fb = -1;
-
-        }
-        else if (pC->fb == 0) {
-            (*pA)->fb = 0;
-            pB->fb = 0;
-        }
-    }
-    pC->fb = 0;
-
-    pB->Esq = pC->Dir;
-    pC->Dir = pB;
-    (*pA)->Dir = pC->Esq;
-    pC->Esq = *pA;
-    *pA = pC;
-
-
+    no2->dir = atual->dir;
+    free(atual);
+    return no2;
 }
-
-int BalancaEsquerda(TArvBin *pA, int IorR){
-	 TArvBin pB = (*pA)->Esq; //Se a esquerda esta desbalanceada devemos verificar qual tipo se rotacao sera feito
-
-    if((pB->fb) >= 0) //Se o filho esquerdo esta desbalanceado a direita, chamamos esquerda esquerda
-        LL(&(*pA), IorR);
-    else if(pB->fb < 0)
-        LR(&(*pA), IorR);
-
-    return(0);
-}
-
-int BalancaDireita(TArvBin *pA, int IorR){
-	TArvBin pB = (*pA)->Dir; //Se a direita esta desbalanceada devemos verificar qual tipo de rotacao sera feito
-
-    if(pB->fb > 0) //Se o filho esquerdo esta desbalanceado a direita, chamamos direita esquerda
-        RL(&(*pA), IorR);
-    else if (pB->fb <= 0)
-        RR(&(*pA), IorR);
-
-    return(0);
-}
-
-TArvBin Inicializa(){
-	return NULL;
-}
-
-TArvBin Pesquisa(TArvBin No, TChave x){
-	if (No == NULL)
-		return NULL; // retorna NULL caso a chave nao seja encontrada
-	else if (x < No->Item.Chave)
-		return Pesquisa(No->Esq, x);
-	else if (x > No->Item.Chave)
-		return Pesquisa(No->Dir, x);
-	else
-		return No;
-}
-
-int Insere(TArvBin *pNo, TItem x){
-	 if (*pNo == NULL) { //Caso a pesquisa seja sem sucesso inserimos utilizando a alocação
-        TNo* No = (TNo*) malloc (sizeof(TNo));
-        No->Item = x;
-        No->Esq = NULL;
-        No->Dir = NULL;
-        No->fb = 0;
-        *pNo = No;
-        return(1);
-    }
-    //Caso contrário percorremos a árvore
-     else {
-        if (x.Chave > (*pNo)->Item.Chave) {
-            if(Insere(&(*pNo)->Dir, x)) {
-                (*pNo)->fb -= 1;
-
-                if((*pNo)->fb == 0)
-                    return(0);
-                else if ((*pNo)->fb == -1)
-                    return(1);
+ 
+//remove um valor na árvore binária
+int remove_ArvAVL(ArvAVL *raiz, int valor){
+    if(raiz == NULL) 
+        return 0;
+    struct NO* ant = NULL;
+    struct NO* atual = *raiz;
+    while(atual != NULL){
+        if(valor == atual -> info){
+            if(atual == *raiz)
+                *raiz = remove_atual(atual);
+            else{
+                if(ant -> dir == atual)
+                    ant -> dir = remove_atual(atual);
                 else
-                    return(BalancaDireita(&(*pNo), 1));
+                    ant -> esq = remove_atual(atual);
+            }
+            return 1;
+        }
+        ant = atual;
+        if(valor > atual -> info)
+            atual = atual -> dir;
+        else
+            atual = atual -> esq;
+    }
+}
+ 
+//cria uma árvore binária
+ArvAVL* cria_ArvAVL(){
+    ArvAVL* raiz = (ArvAVL*) malloc(sizeof(ArvAVL));
+    if(raiz != NULL)
+        *raiz = NULL;
+    return raiz;
+}
+ 
+//calcula a altura da árvore binária
+int altura_ArvAVL(ArvAVL *raiz){
+    if(raiz == NULL)
+        return 0;
+    if(*raiz == NULL)
+        return 0;
+    int alt_esq = altura_ArvAVL(&((*raiz)->esq));
+    int alt_dir = altura_ArvAVL(&((*raiz)->dir));
+    if(alt_esq > alt_dir)
+        return (alt_esq + 1);
+    else
+        return (alt_dir + 1);
+}
+
+void preOrdem_ArvAVL(ArvAVL *raiz){
+    if(raiz == NULL)
+        return;
+    if(*raiz != NULL){
+        printf("(C%d", (*raiz)->info);
+        preOrdem_ArvAVL(&((*raiz)->esq));
+        preOrdem_ArvAVL(&((*raiz)->dir));
+        printf(")");
+    }else{
+        printf("()");
+    }
+}
+
+int insere_ArvAVL(ArvAVL* raiz, int valor){
+    int res;
+    if(*raiz == NULL){
+        struct NO *novo;
+        novo = (struct NO*)malloc(sizeof(struct NO));
+        if(novo == NULL)
+            return 0;
+
+        novo -> info = valor;
+        novo -> alt = 0;
+        novo -> esq = NULL;
+        novo -> dir = NULL;
+        *raiz = novo;
+        return 1;
+    }
+
+    struct NO *atual = *raiz;
+    if(valor < atual->info){
+        if((res=insere_ArvAVL(&(atual->esq), valor))==1){
+            if(fatorBalanceamento_NO(atual) >= 2){
+                if(valor < (*raiz)->esq->info){
+                    RotacaoLL(raiz);
+                }else{
+                    RotacaoLR(raiz);
+                }
             }
         }
-        else if (x.Chave < (*pNo)->Item.Chave) {
-            if(Insere(&(*pNo)->Esq, x)){
-                (*pNo)->fb += 1;
-
-                if((*pNo)->fb == 0)
-                    return(0);
-                else if ((*pNo)->fb == 1)
-                    return(1);
-                else
-                    return(BalancaEsquerda(&(*pNo), 1));
+    }else{
+        if(valor > atual->info){
+            if((res=insere_ArvAVL(&(atual->dir), valor))==1){
+                if(fatorBalanceamento_NO(atual) >= 2){
+                    if((*raiz)->dir->info < valor){
+                        RotacaoRR(raiz);
+                    }else{
+                        RotacaoRL(raiz);
+                    }
+                }
             }
+        }else{
+            printf("\nvalor duplicado!\n");
+            return 0;
         }
-        else if (x.Chave == (*pNo)->Item.Chave)
-            return(0);
     }
-
+    atual->alt = maior(alt_NO(atual->esq), alt_NO(atual->dir)) + 1;
+    return res;
 }
 
-int desceDir (TArvBin *Aux, TArvBin *Susc){
-
-    if ((*Susc)->Esq == NULL) {
-        (*Aux)->Item = (*Susc)->Item;
-        *Aux = *Susc;
-        *Susc = (*Susc)->Dir;
-
-        (*Aux)->fb += 1;
-
-                if((*Aux)->fb == 0)
-                    return(0);
-                else if ((*Aux)->fb == 1)
-                    return(1);
-                else
-                    return(BalancaEsquerda(&(*Aux), 2));
-
+int consulta_ArvAVL(ArvAVL *raiz, int valor){
+    if(raiz == NULL)
+        return ;
+    struct NO* atual = *raiz;
+    while(atual != NULL){
+        if(valor == atual->info){
+            return 1;
+        }
+        if(valor > atual->info)
+            atual = atual->dir;
+        else
+            atual = atual->esq;
     }
-    else{
-        desceDir(Aux, &(*Susc)->Esq);
-
-                (*Aux)->fb -= 1;
-                if((*Aux)->fb == 0)
-                    return(0);
-                else if ((*Aux)->fb == -1)
-                    return(1);
-                else
-                    return(BalancaDireita(&(*Aux), 2));
-
-
-}
-
-}
-
-int Remove(TArvBin *pNo, TChave x){
-	TArvBin Aux;
-    if (*pNo == NULL)
-        return(0);
-
-     else {
-        if (x > (*pNo)->Item.Chave) {
-
-            if(Remove(&(*pNo)->Dir, x)){
-
-                (*pNo)->fb += 1;
-
-                if((*pNo)->fb == 0)
-                    return(0);
-                else if ((*pNo)->fb == 1)
-                    return(1);
-                else
-                    return(BalancaEsquerda(&(*pNo), 2));
-            }
-        }
-
-        else if (x < (*pNo)->Item.Chave) {
-
-            if(Remove(&(*pNo)->Esq, x)) {
-                (*pNo)->fb -= 1;
-                if((*pNo)->fb == 0)
-                    return(0);
-                else if ((*pNo)->fb == -1)
-                    return(1);
-                else
-                    return(BalancaDireita(&(*pNo), 2));
-            }
-        }
-
-        else if (x == (*pNo)->Item.Chave) { //Pesquisa com sucesso deve remover o nó
-            Aux = *pNo;
-
-            if ((*pNo)->Esq == NULL) //Se só existe um filho a esquerda, trocamos de lugar com a direita
-                *pNo = Aux->Dir;
-            else if ((*pNo)->Dir ==  NULL) //Se so existe um filho a direita, trocamos com a esquerda
-                *pNo = Aux->Esq;
-
-            else
-                desceDir(&Aux, &Aux->Dir); // Se ele possui os dois filhos, percorremos toda a direita e troacmos o ultimo da direita
-
-            free(Aux);
-
-            return(1);
-        }
-
-    }
-}
-
-void Carrega(TArvBin *pNo){
-	int i, n;
-	TItem x;
-
-	scanf("%d", &n);
-	for (i = 0; i < n ; i++) {
-		scanf("%d", &x.Chave);
-		Insere(pNo, x);
-	}
-}
-
-void Libera(TArvBin *pNo){
-	TArvBin No;
-
-	No = *pNo;
-	if (No != NULL) {
-		Libera(&No->Esq);
-		Libera(&No->Dir);
-		free(No);
-		(*pNo) = NULL;
-	}
-}
-
-void Imprime(TArvBin No){
-	if (No != NULL) {
-		printf("(C%d", No->Item.Chave);
-		Imprime(No->Esq);
-		Imprime(No->Dir);
-		printf(")");
-	}
-	else
-		printf("()");
+    return 0;
 }
 
 int main(){
-	TArvBin Raiz;
-	TItem x;
+    int altura = 0 , valor, quantidade, i;
+    int valor_pesquisado;
+    ArvAVL *raiz;
+    raiz = cria_ArvAVL();
+     
+    scanf("%d", &quantidade);
 
-	Raiz = Inicializa();
-	Carrega(&Raiz);
-	scanf("%d", &x.Chave);
-	if (Pesquisa(Raiz, x.Chave) == NULL)
-		Insere(&Raiz, x);
-	else
-		Remove(&Raiz, x.Chave);
-	Imprime(Raiz);
-	Libera(&Raiz);
+    for(i=0; i<quantidade; i++){
+        scanf("%d", &valor);
+        insere_ArvAVL(raiz, valor);
+    }
 
-	return 0;
+    scanf("%d", &valor_pesquisado);
+
+    if(consulta_ArvAVL(raiz, valor_pesquisado)){
+        remove_ArvAVL(raiz, valor_pesquisado);
+        preOrdem_ArvAVL(raiz);
+    }else{
+        insere_ArvAVL(raiz, valor_pesquisado);
+        preOrdem_ArvAVL(raiz);
+    }
+
+    return 0;
 }
